@@ -10,6 +10,7 @@ You will need node installed to create this app.  Make sure you run the followin
 ```console
 > npm init
 ```
+I called our main entry point file app.js
 
 We will need the following packages installed in order for this app to work
 
@@ -29,6 +30,19 @@ We will also install the nodemon package to better help with developer error han
 ```console
 > npm install nodemon --save-dev
 ```
+
+You will then create an app.js file.
+
+You will begin to code the app in the following steps.  When you are ready to run your app type in the following command in the terminal:
+
+```console
+> npx nodemon app.js
+```
+You can visit your application by using a web browser and typing in the following url (this is by default if you set your app up and the app.js file like I did in this project):
+
+<localhost:3000>
+
+To test your API requests to grab tweets or post new tweets, you can use the VsCode extention EchoClient.  Watch the lecture for more information.
 
 ## Express
 We will be using express to make our server respond to requests.  Backends work by taking a request from the user, and providing a response.
@@ -109,6 +123,28 @@ Here is a list of all the Mongo Model Data Types:
 
 Here is a list of all the queries you can do in Mongoose: 
 <https://mongoosejs.com/docs/queries.html>
+
+Here is an example of the schema/model you would use in the app.js file
+
+```js
+const Tweet = mongoose.model('Tweet', new mongoose.Schema({
+    //the schema uses a name : data type
+    user: String,
+    content: String,
+    createdAt: {type: Date, default: Date.now}
+}))
+```
+
+Here is an example of a get request to grab all the Tweets
+
+```js
+app.get("/tweets", async function(req,res){
+    //this is a mongoose method that is called .find...it finds all the entries in a database
+    const tweets = await Tweet.find()
+    res.json(tweets)
+
+})
+```
 
 Check out the app.js file for the implementation of the model and the GET (grab all tweets) and POST (add a tweet to the DB) routes.
 
