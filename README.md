@@ -109,3 +109,12 @@ We will use Railway to deploy or app
 URL - <https://railway.com>
 
 First create a github repo of your project (make sure it is public)
+
+
+Click on deploy app from Github and select your Repo
+
+Then click on variables and New.  Add MONGO_URI variable and the connection string as the value (you may have to apply the changes)
+
+Let Railway Deploy the App
+
+Then click on the deployment, and find the deployment section and Generate a New Domain.  This is the url you will use to this API.
