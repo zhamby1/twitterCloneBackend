@@ -83,7 +83,7 @@ You will have to change the password to the password created in the previous ste
 
 we will make a .env file to store our connection so it is secure.  Add a new file and call it .env
 
-Then add the MONGO_URI variable and have it equal your connection string
+Then add the MONGO_URI variable and have it equal your connection string (make sure that you change the password to the password you created in the previous step)
 
 ## Mongoose and MongoDB
 Mongo is a NoSQL database..these are some of the differences between a SQL and NoSQL database
@@ -96,7 +96,13 @@ Mongo is a NoSQL database..these are some of the differences between a SQL and N
 
 Now, that being said, we do like to model our data to look a certain way when we use Mongo.  That way we always know the data is correct that we are sending to the database, and it has a certain format
 
-You will create a models folder, and stick your models inside..check out the model folder and it's contents for more info.
+In our app.js file we will create a schema for our Tweet that looks like following/has the following fields:
+
+| Name | Data Type |
+| ---- | --------- |
+| user | String    |
+| content | String |
+|createdAt | Date (using a default of Date.now) |
 
 Here is a list of all the Mongo Model Data Types:
 <https://mongoosejs.com/docs/schematypes.html>
@@ -104,11 +110,13 @@ Here is a list of all the Mongo Model Data Types:
 Here is a list of all the queries you can do in Mongoose: 
 <https://mongoosejs.com/docs/queries.html>
 
+Check out the app.js file for the implementation of the model and the GET (grab all tweets) and POST (add a tweet to the DB) routes.
+
 ## Deploying Backend
 We will use Railway to deploy or app
 URL - <https://railway.com>
 
-First create a github repo of your project (make sure it is public)
+First create a Github repo of your project (make sure it is public)
 
 
 Click on deploy app from Github and select your Repo
