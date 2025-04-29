@@ -1,108 +1,131 @@
-//grab our dependecies or packages
-const express = require('express')
-const mongoose = require('mongoose')
-const cors = require('cors')
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
 
-const User = require('./models/User')
-const jwt = require('jsonwebtoken')
+dotenv.config();
 
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-//protect our tweet posting or anything really we want to protect...users cannot post unless they are logged in
+// Middleware
+app.use(express.json());  // to parse JSON request body
+app.use(cors());  // Allow cross-origin requests
+
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.log(err));
+
+// Models
+const Tweet = require('./models/Tweet');
+const User = require('./models/User');
+
+// Auth middleware to protect routes
 const authMiddleware = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Unauthorized' });
-  
-    try {
-      const decoded = jwt.verify(token, 'secret');
-      req.userId = decoded.id;
-      next();
-    } catch {
-      res.status(401).json({ message: 'Invalid token' });
-    }
-  };
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Authorization required' });
 
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(401).json({ message: 'Invalid token' });
+    req.user = decoded;
+    next();
+  });
+};
 
-require('dotenv').config()
-const PORT = process.env.PORT || 3000
+// Routes
 
-//we make an instance of the epxpress package
-const app = express()
-//when we use middleware or other types of packages we often say app.use
-app.use(cors())
-app.use(express.json())
+// User signup
+app.post('/signup', async (req, res) => {
+  const { username, password } = req.body;
 
+  try {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-//connect to our mongo DB using mongoose which is a js package to make mongo easier
-mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology : true})
-.then(() => console.log("Mongo Connected"))
-.catch(err => console.log(err))
+    const newUser = new User({
+      username,
+      password: hashedPassword
+    });
 
-//model - aka a schema which shows how the data should look using Mongoose
-const Tweet = mongoose.model('Tweet', new mongoose.Schema({
-    //the schema uses a name : data type
-    user: String,
-    content: String,
-    createdAt: {type: Date, default: Date.now}
-}))
+    await newUser.save();
+    res.status(201).json({ message: 'User created' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
+// User login
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
 
+  try {
+    const user = await User.findOne({ username });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-//using routes
-//make a route for /tweets that grab all the tweets
-app.get("/tweets", async function(req,res){
-    //this is a mongoose method that is called .find...it finds all the entries in a database
-    const tweets = await Tweet.find()
-    res.json(tweets)
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-})
+    const token = jwt.sign({ userId: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, username: user.username });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
-//add tweets to database using a post request
-//we can use the same url path as long as the HTTP request is different
-app.post("/tweets", authMiddleware, async(req,res) => {
-    //when sending data to the backend, it is stored in something known as the requests body
-    const tweet = new Tweet(req.body)
-    await tweet.save()
-    res.status(201).json(tweet)
-})
+// Create a tweet
+app.post('/tweets', authMiddleware, async (req, res) => {
+  const { content } = req.body;
+  const { user } = req;
 
-//when creating a new user ...we use a post route
-app.post('/signup', authMiddleware, async (req,res) =>{
-    const {username, password} = req.body
-    //because we have a bit more requirements for our username..we will use try catch
-    //similar to if else, but responds to errors
-    try{
-        const user = new User({username, password})
-        await user.save()
-        res.status(201).json({message: 'User Created'})
-    }
-    catch (err){
-        res.status(400).json({message: 'User Already Exists'})
-    }
+  try {
+    const newTweet = new Tweet({
+      user: user.username,
+      content
+    });
 
-})
+    await newTweet.save();
+    res.status(201).json(newTweet);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
-//login...logins are not GET request..they are POSTS request because we are creating a new session or sending a new token to the frontend
-app.post('/login', async(req,res) =>{
-    const {username, password} = req.body
-    //find the user based on the username
-    const user = await User.findOne({username})
-    if(!user){
-        return res.status(400).json({message: 'User Not found'})
-    }
-    const isMatch = await user.comparePasswords(password)
-    if(!isMatch){
-        return res.status(400).json({message: 'Invalid Password'})
-    }
-    const token = jwt.sign({id: user._id}, 'secret')
-    res.json({token, username})
-})
+// Get all tweets with comments
+app.get('/tweets', async (req, res) => {
+  try {
+    const tweets = await Tweet.find().sort({ createdAt: -1 }); // Sort by newest first
+    res.json(tweets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
+// Add a comment to a tweet
+app.post('/tweets/:id/comments', authMiddleware, async (req, res) => {
+  const { text } = req.body;
+  const tweetId = req.params.id;
+  const { user } = req;
 
-  
-//start our server we say app.listen(portnumber).  the portnumber can be determined by you.
-//often times we give it an or statement that says run on this port or the OS primary port for web servers
-//this is important because when we deploy our application it will start on the apporpriate port for that particular Os/Machine 
+  try {
+    const tweet = await Tweet.findById(tweetId);
+    if (!tweet) return res.status(404).json({ message: 'Tweet not found' });
 
+    tweet.comments.push({
+      user: user.username,
+      text
+    });
 
-//use app.listen to listen for requests from a port
-app.listen(PORT, () => console.log("Server running"))
+    await tweet.save();
+    res.status(201).json(tweet);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Server setup
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
